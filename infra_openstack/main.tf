@@ -57,6 +57,24 @@ resource "zillaforge_server" "bastion" {
   keypair   = data.zillaforge_keypairs.selected.keypairs[0].id
   password  = var.server_password
 
+  user_data = <<-EOF
+#!/bin/bash
+PASS="${var.server_password}"
+echo "$$PASS" | sudo -S dnf remove -y docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-engine \
+                  podman \
+                  runc || true
+echo "$$PASS" | sudo -S dnf -y install dnf-plugins-core
+echo "$$PASS" | sudo -S dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+echo "$$PASS" | sudo -S dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+echo "$$PASS" | sudo -S systemctl enable --now docker
+EOF
 
   network_attachment {
     network_id         = data.zillaforge_networks.default.networks[0].id
