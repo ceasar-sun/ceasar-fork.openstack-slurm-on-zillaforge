@@ -60,7 +60,9 @@ resource "zillaforge_server" "bastion" {
   user_data = <<-EOF
 #!/bin/bash
 PASS="${var.server_password}"
-echo "$$PASS" | sudo -S dnf remove -y docker \
+
+# Install Docker
+echo "$PASS" | sudo -S dnf remove -y docker \
                   docker-client \
                   docker-client-latest \
                   docker-common \
@@ -70,10 +72,25 @@ echo "$$PASS" | sudo -S dnf remove -y docker \
                   docker-engine \
                   podman \
                   runc || true
-echo "$$PASS" | sudo -S dnf -y install dnf-plugins-core
-echo "$$PASS" | sudo -S dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
-echo "$$PASS" | sudo -S dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-echo "$$PASS" | sudo -S systemctl enable --now docker
+echo "$PASS" | sudo -S dnf -y install dnf-plugins-core
+echo "$PASS" | sudo -S dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+echo "$PASS" | sudo -S dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+echo "$PASS" | sudo -S systemctl enable --now docker
+
+# Generate SSH keypair for cloud-user (skip if already exists)
+CLOUD_USER_HOME=$(getent passwd cloud-user | cut -d: -f6)
+echo "$PASS" | sudo -S -u cloud-user bash -c "[ -f $CLOUD_USER_HOME/.ssh/id_rsa ] || ssh-keygen -t rsa -N '' -f $CLOUD_USER_HOME/.ssh/id_rsa -q"
+
+# Install sshpass to allow password-based ssh-copy-id
+echo "$PASS" | sudo -S dnf install -y sshpass
+
+# Copy SSH public key to all nodes (retry up to 10 times per node to wait for boot)
+%{ for ip in [for s in zillaforge_server.nodes : s.network_attachment[0].ip_address] ~}
+for i in $(seq 1 10); do
+  echo "$PASS" | sudo -S -u cloud-user sshpass -p "$PASS" ssh-copy-id -o StrictHostKeyChecking=no cloud-user@${ip} && break
+  sleep 15
+done
+%{ endfor ~}
 EOF
 
   network_attachment {
