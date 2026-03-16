@@ -96,13 +96,16 @@ resource "zillaforge_server" "nodes" {
 # --------------------------------------------------------------------------
 
 output "bastion_floating_ip" {
-  value = zillaforge_server.bastion.network_attachment[0].floating_ip
+  description = "Bastion 的 Floating IP"
+  value       = zillaforge_floating_ip.bastion.ip_address
 }
 
-output "bastion_id" {
-  value = zillaforge_server.bastion.id
+output "bastion_default_network_ip" {
+  description = "Bastion 在 default network 上的 IP"
+  value       = zillaforge_server.bastion.network_attachment[0].ip_address
 }
 
-output "node_ids" {
-  value = { for s in zillaforge_server.nodes : s.name => s.id }
+output "nodes_default_network_ips" {
+  description = "所有 nodes 在 default network 上的 IP"
+  value       = { for s in zillaforge_server.nodes : s.name => s.network_attachment[0].ip_address }
 }
