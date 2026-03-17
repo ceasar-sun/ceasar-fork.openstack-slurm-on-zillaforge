@@ -3,7 +3,7 @@
 
 # ---- Global variables ----
 [baremetal:vars]
-ansible_user=cloud-user
+ansible_user=${ansible_user}
 ansible_become=true
 ansible_become_password=${server_password}
 ansible_password=${server_password}

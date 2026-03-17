@@ -13,6 +13,10 @@ provider "zillaforge" {
   project_sys_code = var.project_sys_code
 }
 
+locals {
+  cloud_user = "cloud-user"
+}
+
 # --------------------------------------------------------------------------
 # Data sources
 # --------------------------------------------------------------------------
@@ -77,19 +81,19 @@ echo "$PASS" | sudo -S dnf config-manager --add-repo https://download.docker.com
 echo "$PASS" | sudo -S dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 echo "$PASS" | sudo -S systemctl enable --now docker
 echo "$PASS" | sudo -S sudo groupadd docker
-echo "$PASS" | sudo -S usermod -aG docker cloud-user
+echo "$PASS" | sudo -S usermod -aG docker ${local.cloud_user}
 
-# Generate SSH keypair for cloud-user (skip if already exists)
-CLOUD_USER_HOME=$(getent passwd cloud-user | cut -d: -f6)
-echo "$PASS" | sudo -S -u cloud-user bash -c "[ -f $CLOUD_USER_HOME/.ssh/id_rsa ] || ssh-keygen -t rsa -N '' -f $CLOUD_USER_HOME/.ssh/id_rsa -q"
+# Generate SSH keypair for ${local.cloud_user} (skip if already exists)
+CLOUD_USER_HOME=$(getent passwd ${local.cloud_user} | cut -d: -f6)
+echo "$PASS" | sudo -S -u ${local.cloud_user} bash -c "[ -f $CLOUD_USER_HOME/.ssh/id_rsa ] || ssh-keygen -t rsa -N '' -f $CLOUD_USER_HOME/.ssh/id_rsa -q"
 
 # Install sshpass to allow password-based ssh-copy-id
-echo "$PASS" | sudo -S dnf install -y sshpass make
+echo "$PASS" | sudo -S dnf install -y sshpass make tmux vim
 
 # Copy SSH public key to all nodes (retry up to 10 times per node to wait for boot)
 %{ for ip in [for s in zillaforge_server.nodes : s.network_attachment[0].ip_address] ~}
 for i in $(seq 1 10); do
-  echo "$PASS" | sudo -S -u cloud-user sshpass -p "$PASS" ssh-copy-id -o StrictHostKeyChecking=no cloud-user@${ip} && break
+  echo "$PASS" | sudo -S -u ${local.cloud_user} sshpass -p "$PASS" ssh-copy-id -o StrictHostKeyChecking=no ${local.cloud_user}@${ip} && break
   sleep 15
 done
 %{ endfor ~}
@@ -101,9 +105,6 @@ echo "$PASS" | sudo -S chown nobody:nobody /kolla_nfs
 echo "$PASS" | sudo -S chmod 777 /kolla_nfs
 echo "$PASS" | sudo -S bash -c 'echo "/kolla_nfs ${data.zillaforge_networks.default.networks[0].cidr}(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports'
 echo "$PASS" | sudo -S systemctl enable --now nfs-server
-
-# Install additional package
-echo "$PASS" | sudo -S dnf install -y tmux vim
 EOF
 
   network_attachment {
@@ -179,6 +180,7 @@ resource "local_file" "globals_yml" {
 resource "local_file" "vars" {
   content = templatefile("${path.module}/templates/99-vars.tpl", {
     server_password = var.server_password
+    ansible_user    = local.cloud_user
   })
   filename = "${path.module}/../kolla-ansible/etc/kolla/inventroy/99-vars"
 }
