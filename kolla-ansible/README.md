@@ -1,6 +1,75 @@
-# OpenStack 資源建立與跨節點連通驗證
+# Kolla-Ansible
 
-## 資源建立與驗證操作流程
+## 容器設定說明
+
+### 設定容器內帳號的 UID/GID
+
+`kolla-ansible/docker-compose.yaml` 內可透過環境變數設定容器中 `kolla` 帳號的 UID/GID：
+
+```yaml
+environment:
+    - PUID=1000
+    - PGID=1000
+```
+
+容器啟動時，`kolla-ansible/entrypoint.sh` 會使用這兩個值執行：
+
+```shell
+groupmod -o -g "$PGID" kolla
+usermod  -o -u "$PUID" kolla
+```
+
+這樣做的目的，是讓容器內的 `kolla` 使用者和主機上的使用者維持相同的 UID/GID，避免 bind mount 進容器的檔案出現權限不一致的問題。對這個專案來說，`/etc/kolla` 與 `/etc/openstack` 都是從主機掛載進容器，若 UID/GID 不一致，常見情況會是：
+
+* 容器內可以看到檔案，但無法修改
+* 產生的新檔案在主機上變成其他擁有者
+* `kolla-ansible` 執行過程中出現權限錯誤
+
+如果主機上的開發帳號不是 `1000:1000`，可以直接調整 `PUID` 與 `PGID` 成對應值。
+
+### 為什麼要設定 `ANSIBLE_COLLECTIONS_PATH`
+
+`Dockerfile` 內先設定：
+
+```shell
+ENV ANSIBLE_COLLECTIONS_PATH=/usr/share/ansible/collections
+```
+
+之後再執行：
+
+```shell
+kolla-ansible install-deps
+```
+
+原因是 `install-deps` 會安裝 `kolla-ansible` 需要的 Ansible collections/roles，而這些 dependency 需要被安裝到一個明確且在執行時也能被 Ansible 找到的位置。把路徑固定在 `ANSIBLE_COLLECTIONS_PATH` 有幾個好處：
+
+* 建置階段與執行階段使用相同搜尋路徑，避免 `ansible-galaxy` 裝好了，但執行 `kolla-ansible` 時找不到 collection
+* 不依賴使用者家目錄下的預設路徑，降低因切換使用者或變更 UID/GID 後產生的路徑差異
+* 將 dependency 放在系統層路徑，容器重啟後仍維持一致的執行環境
+
+`docker-compose.yaml` 內也保留同樣的 `ANSIBLE_COLLECTIONS_PATH` 設定，目的是確保互動式進入容器或直接執行 `kolla-ansible`/`ansible` 指令時，Ansible 仍然會從同一個位置載入已安裝的 collections。
+
+## Inventory 說明
+
+`kolla-ansible` 的指令目前是以整個 inventory 目錄作為輸入：
+
+```shell
+kolla-ansible deploy -i /etc/kolla/inventroy/
+```
+
+這代表 Ansible 不是只讀單一檔案，而是會把 `inventroy/` 目錄下的多個 inventory 檔案一起合併成最終的 inventory。這個專案目前有四個檔案：
+
+* `01-controller`
+* `05-compute`
+* `10-inventory-template`
+* `99-vars`
+
+檔名前面的數字是為了表達分層順序：先定義主機，再補 service group 關係，最後再套用共用變數。
+
+
+
+
+## OpenStack 資源建立與驗證操作流程
 在透過 Kolla-Ansible 部署好的 OpenStack 環境中，建立兩個分別位於不同 Compute Node 的 CirrOS 虛擬機 (VM)，並驗證兩者可以正常啟動且跨節點進行網路連通。目前無對外網路，僅驗證內網互通。
 
 *(以下 OpenStack 相關指令皆在 `kolla_ansible` 容器中執行，並事先 `source /etc/kolla/admin-openrc.sh`)*

@@ -2,16 +2,13 @@
 # External scripts — runs during terraform plan/apply on the local machine
 # --------------------------------------------------------------------------
 
-# Early dependency check — ensures sshpass & ssh exist on this machine
-# before any resource is created (runs during terraform plan).
-data "external" "check_deps" {
-  program = ["bash", "${path.module}/scripts/check_deps.sh"]
-  query   = {}
+module "check_deps" {
+  source = "../modules/check_deps"
 }
 
 # Discover NIC names by SSH-ing into bastion after it is reachable
 data "external" "nic_names" {
-  depends_on = [data.external.check_deps]
+  depends_on = [module.check_deps]
   program    = ["bash", "${path.module}/scripts/discover_nics.sh"]
 
   query = {

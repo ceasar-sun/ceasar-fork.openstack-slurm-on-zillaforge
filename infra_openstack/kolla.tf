@@ -46,20 +46,13 @@ resource "local_file" "controller" {
   filename = "${path.module}/../kolla-ansible/etc/kolla/inventroy/01-controller"
 }
 
-resource "null_resource" "sync_project" {
+module "sync_project" {
+  source = "../modules/sync_project"
+
   depends_on = [local_file.globals_yml]
 
-  triggers = {
-    bastion_ip   = zillaforge_floating_ip.bastion.ip_address
-    project_root = local.project_root
-  }
-
-  provisioner "local-exec" {
-    interpreter = ["bash", "-c"]
-    command     = <<-EOF
-      set -euo pipefail
-      command -v sshpass >/dev/null || { echo "sshpass is required to sync files"; exit 1; }
-      sshpass -p "${var.server_password}" rsync -az --exclude '.git' -e "ssh -o StrictHostKeyChecking=no" "${local.project_root}/" "${local.cloud_user}@${zillaforge_floating_ip.bastion.ip_address}:resource_manage/"
-    EOF
-  }
+  project_root    = local.project_root
+  cloud_user      = local.cloud_user
+  server_password = var.server_password
+  target_host     = zillaforge_floating_ip.bastion.ip_address
 }

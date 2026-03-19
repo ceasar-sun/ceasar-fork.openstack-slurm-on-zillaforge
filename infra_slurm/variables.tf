@@ -17,9 +17,9 @@ variable "project_sys_code" {
 }
 
 variable "node_name_prefix" {
-  description = "Prefix used for OpenStack node names"
+  description = "Prefix used for Slurm node names"
   type        = string
-  default     = "opsk"
+  default     = "slurm"
 }
 
 variable "keypair_name" {
@@ -59,24 +59,19 @@ variable "default_network_name" {
 }
 
 variable "optional_network_name" {
-  description = "Network name to attach the server to; must be provided. If the network does not exist will be fail."
+  description = "Optional network name to attach the server to. If omitted or not found, the servers will use only the default network."
   type        = string
-  nullable    = false
-
-  validation {
-    condition     = var.optional_network_name != ""
-    error_message = "optional_network_name must not be empty — please supply a network name."
-  }
+  default     = null
 }
 
-variable "total" {
-  description = "Number of VMs to create (minimum 2: at least one controller and one compute)"
+variable "compute_count" {
+  description = "Number of Slurm compute nodes to create"
   type        = number
   default     = 2
 
   validation {
-    condition     = var.total >= 2
-    error_message = "total must be at least 2 (one controller + one compute node)."
+    condition     = var.compute_count >= 1
+    error_message = "compute_count must be at least 1."
   }
 }
 
@@ -90,4 +85,18 @@ variable "server_password" {
     condition     = var.server_password != ""
     error_message = "server_password must not be empty — please supply a password."
   }
+}
+
+
+variable "cluster_name" {
+  description = "Slurm cluster name"
+  type        = string
+  default     = "poc-cluster"
+}
+
+variable "db_password" {
+  description = "MariaDB password for Slurm accounting database"
+  type        = string
+  sensitive   = true
+  default     = "slurmdbpass"
 }

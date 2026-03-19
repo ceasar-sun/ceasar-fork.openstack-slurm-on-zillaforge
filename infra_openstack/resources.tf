@@ -3,11 +3,11 @@
 # --------------------------------------------------------------------------
 
 resource "zillaforge_floating_ip" "bastion" {
-  name = "opsk-bastion-tf-fip"
+  name = format("%s-bastion-tf-fip", var.node_name_prefix)
 }
 
 resource "zillaforge_server" "bastion" {
-  name      = "opsk-00-bastion-tf"
+  name      = format("%s-00-bastion-tf", var.node_name_prefix)
   flavor_id = data.zillaforge_flavors.selected.flavors[0].id
   image_id  = data.zillaforge_images.selected.images[0].id
   keypair   = data.zillaforge_keypairs.selected.keypairs[0].id
@@ -78,7 +78,7 @@ EOF
 resource "zillaforge_server" "nodes" {
   count = var.total
 
-  name      = count.index == 0 ? "opsk-01-control-tf" : format("opsk-%02d-compute-tf", count.index + 1)
+  name      = count.index == 0 ? format("%s-01-control-tf", var.node_name_prefix) : format("%s-%02d-compute-tf", var.node_name_prefix, count.index + 1)
   flavor_id = data.zillaforge_flavors.selected.flavors[0].id
   image_id  = data.zillaforge_images.selected.images[0].id
   keypair   = data.zillaforge_keypairs.selected.keypairs[0].id
