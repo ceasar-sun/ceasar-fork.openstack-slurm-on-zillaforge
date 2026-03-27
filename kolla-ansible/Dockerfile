@@ -24,7 +24,8 @@ RUN     dnf -y install \
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | /usr/bin/python3.11
 
 RUN     pip install git+https://opendev.org/openstack/kolla-ansible@stable/2024.2 \
-    &&  pip install python-openstackclient
+    &&  pip install git+https://opendev.org/openstack/osc-placement@stable/2024.2 \
+    &&  pip install git+https://opendev.org/openstack/python-openstackclient@stable/2024.2
 
 
 # 建立預設帳號

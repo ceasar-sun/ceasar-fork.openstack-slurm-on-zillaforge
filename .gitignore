@@ -10,6 +10,5 @@ kolla-ansible/**/nfs_shares
 kolla-ansible/**/globals.yml
 kolla-ansible/**/01-controller
 kolla-ansible/**/05-compute
-kolla-ansible/**/07-compute-odd
-kolla-ansible/**/08-compute-even
+kolla-ansible/**/09-slurm-compute
 kolla-ansible/**/99-vars

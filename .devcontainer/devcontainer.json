@@ -10,9 +10,13 @@
 				"isudox.vscode-jetbrains-keybindings",
 				"pjmiravalle.terraform-advanced-syntax-highlighting",
 				"vtkn.amazon-bedrock-copilot-chat",
-				"onnovalkering.vscode-singularity"
+				"onnovalkering.vscode-singularity",
+				"bierner.markdown-mermaid"
 			]
 		}
+	},
+	"containerEnv": {
+		"TFENV_AUTO_INSTALL": "false",
 	},
 	"features": {
     	"ghcr.io/cirolosapio/devcontainers-features/alpine-git:0": {}

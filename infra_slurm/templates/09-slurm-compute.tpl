@@ -3,5 +3,5 @@
 
 [compute]
 %{ for node in compute_nodes ~}
-# ${node.name} ansible_host=${node.ip}
+${node.name} ansible_host=${node.ip}
 %{ endfor ~}

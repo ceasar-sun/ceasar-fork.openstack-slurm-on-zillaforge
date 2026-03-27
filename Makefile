@@ -11,15 +11,20 @@ KOLLA_SINGULARITYFILE ?= kolla-ansible/Singularity.def
 KOLLA_COMPOSE_FILE ?= kolla-ansible/docker-compose.yaml
 SIF_FILE ?= kolla-ansible.sif
 
-KOLLA_CMD ?= 
-LIMIT ?=
-ALLOWED_KOLLA_CMDS := bootstrap-servers prechecks pull deploy
+MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
+PARTITION ?=
+OCCUPY_NUM ?=
+
+JOB_ID ?=
 
 .PHONY: help terraform-container \
 		slurm-up-via-terraform slurm-destroy-via-terraform \
 		openstack-up-via-terraform openstack-down-via-terraform \
 		kolla-image kolla-up kolla-shell kolla-down \
-		singilarity-image singilarity-shell singilarity-deploy-job
+		singilarity-image singilarity-shell \
+		singilarity-srun-shrink \
+		singilarity-sbatch-expand singilarity-sbatch-shrink
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-32s %s\n", $$1, $$2; if ($$1 == "openstack-down-via-terraform" || $$1 == "kolla-shell" || $$1 == "help") printf "\n"}' $(MAKEFILE_LIST)
@@ -39,7 +44,8 @@ terraform-container: ## Open a container with Terraform dependencies
 		exit 1; \
 	fi; \
 	echo "Using $(TF_IMAGE):$$selected_tag"; \
-	docker run -ti --rm -v $$(pwd):/workspace --workdir /workspace $(TF_IMAGE):$$selected_tag sh -c 'apk add make openssh rsync sshpass && bash'
+	docker run -ti --rm -v $$(pwd):/workspace -e TFENV_AUTO_INSTALL=false \
+	--workdir /workspace $(TF_IMAGE):$$selected_tag sh -c 'apk add make openssh rsync sshpass && bash'
 
 slurm-up-via-terraform: ## Initialize, plan, and apply the Slurm stack
 	$(TERRAFORM) -chdir=$(SLURM_DIR) init
@@ -80,18 +86,39 @@ singilarity-shell: ## Open Singularity Shell
 	-B kolla-ansible/etc/openstack/:/etc/openstack \
 	$(SIF_FILE)
 
-singilarity-submit: ## Submit a Singularity Job to run Kolla-Ansible Command
-	@if ! printf '%s\n' $(ALLOWED_KOLLA_CMDS) | grep -qx -- "$(KOLLA_CMD)"; then \
-		echo "ERROR: KOLLA_CMD must be one of: $(ALLOWED_KOLLA_CMDS)"; \
+singilarity-srun-shrink: ## srun shrink compute nodes
+	@if [ -z "$(strip $(PARTITION))" ]; then \
+		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singilarity-sbatch-shrink)"; \
 		exit 1; \
 	fi
-	@if [ -z "$(strip $(LIMIT))" ]; then \
-		echo "ERROR: LIMIT must be set (for example: make KOLLA_CMD=deploy LIMIT=<NODE_NAME> singilarity-submit)"; \
+	@if [ -z "$(strip $(JOB_ID))" ]; then \
+		echo "ERROR: JOB_ID must be set (for example: make JOB_ID=<JOB_ID> singilarity-sbatch-shrink)"; \
+		exit 1; \
+	fi	
+	srun -J shrink -p $(PARTITION) -N 1 bash $(MAKEFILE_DIR)job_scripts/submit.sh del $(JOB_ID)
+
+singilarity-sbatch-expand: ## Run batch Job to expand compute nodes
+	@if [ -z "$(strip $(PARTITION))" ]; then \
+		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singilarity-sbatch)"; \
 		exit 1; \
 	fi
-	srun -N 1 -J $(KOLLA_CMD) \
-	singularity exec \
-	-B kolla-ansible/etc/kolla/:/etc/kolla \
-	-B kolla-ansible/etc/openstack/:/etc/openstack \
-	$(SIF_FILE) \
-	kolla-ansible $(KOLLA_CMD) -i /etc/kolla/inventroy/   --limit $(LIMIT)
+	@if [ -z "$(strip $(OCCUPY_NUM))" ]; then \
+		echo "ERROR: OCCUPY_NUM must be set (for example: make OCCUPY_NUM=<NUM_NODES> singilarity-sbatch)"; \
+		exit 1; \
+	fi
+	sbatch -J expand -p $(PARTITION) -N $(OCCUPY_NUM) \
+		--export=ALL,PROJECT_DIR=$(MAKEFILE_DIR),PAYLOAD_DIR=$(MAKEFILE_DIR)job_scripts \
+		$(MAKEFILE_DIR)job_scripts/submit.sh add
+
+singilarity-sbatch-shrink: ## Run batch Job to shrink compute nodes from previous expand job
+	@if [ -z "$(strip $(PARTITION))" ]; then \
+		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singilarity-sbatch-shrink)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(strip $(JOB_ID))" ]; then \
+		echo "ERROR: JOB_ID must be set (for example: make JOB_ID=<JOB_ID> singilarity-sbatch-shrink)"; \
+		exit 1; \
+	fi	
+	sbatch -J shrink -p $(PARTITION) -N 1 \
+		--export=ALL,PROJECT_DIR=$(MAKEFILE_DIR),PAYLOAD_DIR=$(MAKEFILE_DIR)job_scripts \
+		$(MAKEFILE_DIR)job_scripts/submit.sh del $(JOB_ID)

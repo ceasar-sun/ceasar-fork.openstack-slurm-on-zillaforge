@@ -1,4 +1,4 @@
-# 資源動態調度
+# Run Kolla Ansible in Slurm Job
 
 
 ## Prepare Terraform Container Environment
@@ -79,64 +79,84 @@ headnode_floating_ip = "x.x.x.x"
 ## ssh to slurm headnode
 ssh cloud-user@x.x.x.x
 
-cd ~/c
+cd ~/resource_manage
 sudo make singilarity-image
 
-make singilarity-shell
 ```
 
 
-## Add OpenStack Compute
+## Add new OpenStack Compute
 
 **NOTE:**
 
-While `inventroy` information and `passwords.yml` MUST be shared.
+Whole `inventroy` information and `passwords.yml` MUST be shared.
 
 ```shell
-# Remove unused inventory files
-rm ~/resource_manage/kolla-ansible/etc/kolla/inventroy/01-controller
-rm ~/resource_manage/kolla-ansible/etc/kolla/inventroy/05-compute
-
 # Copy passwords.yml & globals.yml from "EXISTING" OpenStack Cluster
 
-scp cloud-user@y.y.y.y:~/resource_manage/kolla-ansible/etc/kolla/passwords.yml ~/resource_manage/kolla-ansible/etc/kolla/
-scp cloud-user@y.y.y.y:~/resource_manage/kolla-ansible/etc/kolla/globals.yml   ~/resource_manage/kolla-ansible/etc/kolla/
+export BASTION_FIP=x.x.x.x
+scp cloud-user@${BASTION_FIP}:~/resource_manage/kolla-ansible/etc/kolla/passwords.yml    ~/resource_manage/kolla-ansible/etc/kolla/
+scp cloud-user@${BASTION_FIP}:~/resource_manage/kolla-ansible/etc/kolla/globals.yml      ~/resource_manage/kolla-ansible/etc/kolla/
 ```
 
-### Run in singilarity-shell 
+### Inside a singilarity shell run commands
 
 ```shell
+# Start a shell for singularity SIF
+make singilarity-shell
+
+# Execute commands in the singularity shell
 kolla-ansible bootstrap-servers -i /etc/kolla/inventroy/    --limit <NODE_NAME>
 kolla-ansible prechecks         -i /etc/kolla/inventroy/    --limit <NODE_NAME>
 kolla-ansible pull              -i /etc/kolla/inventroy/    --limit <NODE_NAME>
 kolla-ansible deploy            -i /etc/kolla/inventroy/    --limit <NODE_NAME>
 ```
 
+### Submit a Batch Job for adding nodes
 
-在 controller 上，強制openstack 發現新節點，不然要等五分鐘
 ```shell
-docker exec -t nova_api nova-manage cell_v2 discover_hosts --verbose
+# Submit a slurm job, use singularity container to run Kolla-Ansible Commands
+make PARTITION=<partition> OCCUPY_NUM=<num> singilarity-sbatch-expand
+
 ```
 
-### Run Deployment as a SLURM Job
+## Remove Existing OpenStack Compute
 
-`KOLLA_CMD` 只接受以下值：`bootstrap-servers`、`prechecks`、`pull`、`deploy`。
-`LIMIT` 必須明確提供，沒有預設值，避免誤放到整個 inventory。
+**Note:** 
+
+OpenStack credentials are **MUST** required. That is because some OpenStack administration operation will be executed when removing node. 
+
 
 ```shell
-make KOLLA_CMD=bootstrap-servers LIMIT=<NODE_NAME> singilarity-submit
-make KOLLA_CMD=prechecks         LIMIT=<NODE_NAME> singilarity-submit
-make KOLLA_CMD=pull              LIMIT=<NODE_NAME> singilarity-submit
-make KOLLA_CMD=deploy            LIMIT=<NODE_NAME> singilarity-submit
+export BASTION_FIP=x.x.x.x
+scp cloud-user@${BASTION_FIP}:~/resource_manage/kolla-ansible/etc/kolla/admin-openrc.sh  ~/resource_manage/kolla-ansible/etc/kolla/
+```
+
+
+### Submit a real time job for deleting nodes
+
+```shell
+make PARTITION=<PARTITION> JOB_ID=<JOB_ID> singilarity-srun-shrink
+```
+
+
+### Submit a Batch Job for deleting nodes
+
+```shell
+make PARTITION=<PARTITION> JOB_ID=<JOB_ID> singilarity-sbatch-shrink
 ```
 
 
 ## RoadMap
 
 * [x] Setup infrastructure from Terraform
-    * [x] OpenStack
-    * [x] Slurm
+  * [x] OpenStack
+  * [x] Slurm
 
 * [x] Run Kolla-Ansible in Conatiner
-    * [x] Docker Container
-    * [x] Singularity Container
+  * [x] Docker Container
+  * [x] Singularity Container
+
+* [x] Run Kolla-Ansible in Slurm Job
+  * [x] Add new node
+  * [x] Delete existing node

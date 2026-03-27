@@ -15,6 +15,7 @@ resource "zillaforge_server" "bastion" {
 
   user_data = <<-EOF
 #!/bin/bash
+hostnamectl set-hostname "${format("%s-00-bastion-tf", var.node_name_prefix)}"
 PASS="${var.server_password}"
 
 # Install Docker
@@ -114,6 +115,11 @@ resource "zillaforge_server" "nodes" {
   image_id  = data.zillaforge_images.selected.images[0].id
   keypair   = data.zillaforge_keypairs.selected.keypairs[0].id
   password  = var.server_password
+
+  user_data = <<-USERDATA
+#!/bin/bash
+hostnamectl set-hostname "${count.index == 0 ? format("%s-01-control-tf", var.node_name_prefix) : format("%s-%02d-compute-tf", var.node_name_prefix, count.index + 1)}"
+USERDATA
 
   network_attachment {
     network_id         = data.zillaforge_networks.default.networks[0].id
