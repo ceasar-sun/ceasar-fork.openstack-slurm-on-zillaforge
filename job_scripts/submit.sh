@@ -47,9 +47,21 @@ BIND_ARGS="-B $PROJECT_DIR/kolla-ansible/etc/kolla/:/etc/kolla -B $PROJECT_DIR/k
 # 4. 啟動 Singularity 並執行 payload.sh
 echo "開始執行 $PAYLOAD_SCRIPT Job，目標節點: $NODE_LIST"
 
-# 使用 singularity exec 在容器內執行 bash 腳本，並把參數傳給它
-singularity exec $BIND_ARGS $IMAGE_PATH bash "$PAYLOAD_DIR/$PAYLOAD_SCRIPT" $NODE_LIST
+if [ "$ACTION" = "add" ]; then
+    # 背景執行，讓 submit.sh 的 wait 能被 SIGUSR1 中斷並觸發 trap
+    singularity exec $BIND_ARGS $IMAGE_PATH bash "$PAYLOAD_DIR/$PAYLOAD_SCRIPT" $NODE_LIST
 
-# 只有 del ACTION 才會到這邊, send SIGUSR1 可 expand job
-scancel --batch --signal=SIGUSR1 $OCCUPY_JOB_ID
-echo "回收先前佔位 Job, ID: $OCCUPY_JOB_ID。"
+    echo "Expanding Compute to existing cluster finished, wait for Recycle signal."
+    trap 'echo "Receive recycle signal, exit..."; exit 0' SIGUSR1
+    # 關閉 set -e，避免 wait 被信號中斷時因非零返回值直接退出（繞過 trap）
+    set +e
+    sleep infinity &
+    wait $!
+    set -e
+else
+    singularity exec $BIND_ARGS $IMAGE_PATH bash "$PAYLOAD_DIR/$PAYLOAD_SCRIPT" $NODE_LIST
+
+    # send SIGUSR1 讓 expand job graceful exit
+    scancel --batch --signal=SIGUSR1 $OCCUPY_JOB_ID
+    echo "回收先前佔位 Job, ID: $OCCUPY_JOB_ID。"
+fi

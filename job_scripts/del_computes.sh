@@ -9,8 +9,8 @@ if [ -z "$NODE_LIST" ]; then
     exit 1
 fi
 
-## TODO: 
-source /etc/kolla/admin-openrc.sh
+export OS_CLOUD=${OS_CLOUD:-kolla-admin}
+export OS_CLIENT_CONFIG_FILE=${OS_CLIENT_CONFIG_FILE:-/etc/kolla/clouds.yaml}
 
 IFS=',' read -ra NODES <<< "$NODE_LIST"
 

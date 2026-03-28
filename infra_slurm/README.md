@@ -13,8 +13,8 @@ sequenceDiagram
         participant C2 as Slurm<br/>Compute-2
         participant C3 as Slurm<br/>Compute-3
     end
-    participant OSC1 as OpenStack<br/>Compute-1
     participant Ctrl as OpenStack<br/>Controller
+    participant OSC1 as OpenStack<br/>Compute-1
     participant Bastion
 
     User->>HN: make singilarity-sbatch-expand<br/>PARTITION=p OCCUPY_NUM=2
@@ -54,9 +54,9 @@ sequenceDiagram
         participant C2 as Slurm<br/>Compute-2
         participant C3 as Slurm<br/>Compute-3
     end
-    
-    participant OSC1 as OpenStack<br/>Compute-1
+
     participant Ctrl as OpenStack<br/>Controller
+    participant OSC1 as OpenStack<br/>Compute-1
     participant Bastion
 
     Note over C2: sleep infinity & wait for SIGUSR1 to recycle
@@ -89,4 +89,6 @@ sequenceDiagram
     C2->>C2: trap SIGUSR1 -> exit 0
     HN->>C2: Deallocate
     HN->>C3: Deallocate
+    C1->>C1: exit 0
+    HN->>C1: Deallocate
 ```

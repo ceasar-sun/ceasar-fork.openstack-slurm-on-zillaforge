@@ -9,6 +9,8 @@ services:
       - ANSIBLE_COLLECTIONS_PATH=/usr/share/ansible/collections
       - PUID=1000
       - PGID=1000
+      - OS_CLOUD=kolla-admin
+      - OS_CLIENT_CONFIG_FILE=/etc/kolla/clouds.yaml
     command:
       - "/bin/sh"
       - "-c"

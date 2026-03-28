@@ -130,6 +130,7 @@ OpenStack credentials are **MUST** required. That is because some OpenStack admi
 ```shell
 export BASTION_FIP=x.x.x.x
 scp cloud-user@${BASTION_FIP}:~/resource_manage/kolla-ansible/etc/kolla/admin-openrc.sh  ~/resource_manage/kolla-ansible/etc/kolla/
+scp cloud-user@${BASTION_FIP}:~/resource_manage/kolla-ansible/etc/kolla/clouds.yaml      ~/resource_manage/kolla-ansible/etc/kolla/
 ```
 
 
