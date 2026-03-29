@@ -19,8 +19,9 @@ OCCUPY_NUM ?=
 JOB_ID ?=
 
 DEST ?=
+SRC ?=
 
-.PHONY: help terraform-container ssh-to \
+.PHONY: help terraform-container ssh-to sync-to sync-from \
 		slurm-up slurm-down \
 		openstack-up openstack-down \
 		kolla-image kolla-up kolla-shell kolla-down \
@@ -29,7 +30,7 @@ DEST ?=
 		singilarity-sbatch-expand singilarity-sbatch-shrink
 
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-32s %s\n", $$1, $$2; if ($$1 == "ssh-to" || $$1 == "kolla-shell" || $$1 == "help") printf "\n"}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-32s %s\n", $$1, $$2; if ($$1 == "sync-from" || $$1 == "kolla-shell" || $$1 == "help") printf "\n"}' $(MAKEFILE_LIST)
 
 terraform-container: ## Open a container with Terraform dependencies
 	@set -e; \
@@ -80,6 +81,32 @@ ssh-to: ## SSH into slurm (headnode) or openstack (bastion) using Terraform floa
 	fi; \
 	echo "Connecting to $$ip ..."; \
 	ssh -o StrictHostKeyChecking=no cloud-user@$$ip
+
+sync-to: ## Sync local project (excluding .git) to remote resource_manage/ (DEST=slurm|openstack)
+	@if [ "$(DEST)" != "slurm" ] && [ "$(DEST)" != "openstack" ]; then \
+		echo "ERROR: DEST must be 'slurm' or 'openstack' (e.g. make DEST=slurm sync-to)"; \
+		exit 1; \
+	fi
+	@if [ "$(DEST)" = "slurm" ]; then \
+		ip=$$($(TERRAFORM) -chdir=$(SLURM_DIR) output -raw headnode_floating_ip); \
+	else \
+		ip=$$($(TERRAFORM) -chdir=$(OPENSTACK_DIR) output -raw bastion_floating_ip); \
+	fi; \
+	echo "Syncing to cloud-user@$$ip:resource_manage/ ..."; \
+	rsync -az --exclude '.git' -e "ssh -o StrictHostKeyChecking=no" $(MAKEFILE_DIR) cloud-user@$$ip:resource_manage/
+
+sync-from: ## Sync remote resource_manage/ (excluding .sif and .out) back to local project (SRC=slurm|openstack)
+	@if [ "$(SRC)" != "slurm" ] && [ "$(SRC)" != "openstack" ]; then \
+		echo "ERROR: DEST must be 'slurm' or 'openstack' (e.g. make SRC=slurm sync-from)"; \
+		exit 1; \
+	fi
+	@if [ "$(SRC)" = "slurm" ]; then \
+		ip=$$($(TERRAFORM) -chdir=$(SLURM_DIR) output -raw headnode_floating_ip); \
+	else \
+		ip=$$($(TERRAFORM) -chdir=$(OPENSTACK_DIR) output -raw bastion_floating_ip); \
+	fi; \
+	echo "Syncing from cloud-user@$$ip:resource_manage/ ..."; \
+	rsync -az --exclude '*.out' --exclude '*.sif' -e "ssh -o StrictHostKeyChecking=no" cloud-user@$$ip:resource_manage/ $(MAKEFILE_DIR)
 
 kolla-image: ## Build the Kolla-Ansible image
 	docker build -t kolla-ansible:$(KA_VER_TAG) -f $(KOLLA_DOCKERFILE) .
