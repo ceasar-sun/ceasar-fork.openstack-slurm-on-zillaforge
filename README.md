@@ -38,7 +38,7 @@ default_network_ips = {
 }
 
 # ssh to openstack bastion
-ssh cloud-user@y.y.y.y
+make DEST=openstack ssh-to
 
 ## execute in opnestack bastion
 cd ~/resource_manage
@@ -77,7 +77,7 @@ default_network_ips = {
 headnode_floating_ip = "x.x.x.x"
 
 ## ssh to slurm headnode
-ssh cloud-user@x.x.x.x
+make DEST=slurm ssh-to
 
 cd ~/resource_manage
 sudo make singilarity-image

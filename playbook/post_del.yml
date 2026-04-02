@@ -1,0 +1,50 @@
+###
+# ansible-playbook -i <inventory> playbook/disable_slurmd.yml
+#
+##
+---
+- name: Reboot baremetal hosts
+  hosts: baremetal
+  become: true  
+  tasks:
+    - name: Reboot hosts and wait for them to come back online
+      ansible.builtin.reboot:
+        msg: "Rebooting to prepare for cleanup tasks"
+        pre_reboot_delay: 10
+        post_reboot_delay: 30
+        reboot_timeout: 600
+
+- name: Post-cleanup - Remove Docker SDK and Docker engine from baremetal hosts
+  hosts: baremetal
+  become: true
+  gather_facts: true
+  tasks:
+    - ansible.builtin.include_role:
+        name: post-cleanup
+        tasks_from: remove_docker_sdk
+      tags: [remove_docker_sdk]
+
+    - ansible.builtin.include_role:
+        name: post-cleanup
+        tasks_from: cleanup_docker
+      tags: [cleanup_docker]
+
+- name: Post-cleanup - Remove /etc/hosts generated block from all hosts
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_role:
+        name: post-cleanup
+        tasks_from: remove_etc_hosts_block
+      tags: [remove_etc_hosts_block]
+
+- name: Start and enable slurmd service
+  hosts: all
+  become: true
+  tasks:
+    - name: Start and enable slurmd
+      ansible.builtin.systemd:
+        name: slurmd
+        state: started
+        enabled: true

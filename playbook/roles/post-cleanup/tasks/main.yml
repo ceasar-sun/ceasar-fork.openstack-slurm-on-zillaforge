@@ -1,0 +1,9 @@
+---
+- import_tasks: remove_docker_sdk.yml
+  tags: [remove_docker_sdk]
+
+- import_tasks: cleanup_docker.yml
+  tags: [cleanup_docker]
+
+- import_tasks: remove_etc_hosts_block.yml
+  tags: [remove_etc_hosts_block]

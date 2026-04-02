@@ -1,0 +1,8 @@
+---
+- name: Pre-add preparation tasks
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Dummy task - Pre-add placeholder
+      debug:
+        msg: "Pre-add preparation tasks - placeholder for future functionality"

@@ -19,18 +19,17 @@ OCCUPY_NUM ?=
 JOB_ID ?=
 
 DEST ?=
-SRC ?=
 
-.PHONY: help terraform-container ssh-to sync-to sync-from \
+.PHONY: help terraform-container ssh-to sync-to \
 		slurm-up slurm-down \
 		openstack-up openstack-down \
 		kolla-image kolla-up kolla-shell kolla-down \
 		singilarity-image singilarity-shell \
-		singilarity-srun-shrink \
+		singilarity-srun-expand   singilarity-srun-shrink \
 		singilarity-sbatch-expand singilarity-sbatch-shrink
 
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-32s %s\n", $$1, $$2; if ($$1 == "sync-from" || $$1 == "kolla-shell" || $$1 == "help") printf "\n"}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-32s %s\n", $$1, $$2; if ($$1 == "sync-from" || $$1 == "kolla-shell" || $$1 == "help" || $$1 == "sync-to") printf "\n"}' $(MAKEFILE_LIST)
 
 terraform-container: ## Open a container with Terraform dependencies
 	@set -e; \
@@ -95,19 +94,6 @@ sync-to: ## Sync local project (excluding .git) to remote resource_manage/ (DEST
 	echo "Syncing to cloud-user@$$ip:resource_manage/ ..."; \
 	rsync -az --exclude '.git' -e "ssh -o StrictHostKeyChecking=no" $(MAKEFILE_DIR) cloud-user@$$ip:resource_manage/
 
-sync-from: ## Sync remote resource_manage/ (excluding .sif and .out) back to local project (SRC=slurm|openstack)
-	@if [ "$(SRC)" != "slurm" ] && [ "$(SRC)" != "openstack" ]; then \
-		echo "ERROR: DEST must be 'slurm' or 'openstack' (e.g. make SRC=slurm sync-from)"; \
-		exit 1; \
-	fi
-	@if [ "$(SRC)" = "slurm" ]; then \
-		ip=$$($(TERRAFORM) -chdir=$(SLURM_DIR) output -raw headnode_floating_ip); \
-	else \
-		ip=$$($(TERRAFORM) -chdir=$(OPENSTACK_DIR) output -raw bastion_floating_ip); \
-	fi; \
-	echo "Syncing from cloud-user@$$ip:resource_manage/ ..."; \
-	rsync -az --exclude '*.out' --exclude '*.sif' -e "ssh -o StrictHostKeyChecking=no" cloud-user@$$ip:resource_manage/ $(MAKEFILE_DIR)
-
 kolla-image: ## Build the Kolla-Ansible image
 	docker build -t kolla-ansible:$(KA_VER_TAG) -f $(KOLLA_DOCKERFILE) .
 
@@ -127,7 +113,19 @@ singilarity-shell: ## Open Singularity Shell
 	singularity shell \
 	-B kolla-ansible/etc/kolla/:/etc/kolla \
 	-B kolla-ansible/etc/openstack/:/etc/openstack \
+	-B playbook:/playbook" \
 	$(SIF_FILE)
+
+singilarity-srun-expand: ## srun expand compute nodes
+	@if [ -z "$(strip $(PARTITION))" ]; then \
+		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singilarity-srun-expand)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(strip $(OCCUPY_NUM))" ]; then \
+		echo "ERROR: OCCUPY_NUM must be set (for example: make OCCUPY_NUM=<NUM_NODES> singilarity-srun-expand)"; \
+		exit 1; \
+	fi
+	srun -J expand -p $(PARTITION) -N $(OCCUPY_NUM) bash $(MAKEFILE_DIR)job_scripts/submit.sh add
 
 singilarity-srun-shrink: ## srun shrink compute nodes
 	@if [ -z "$(strip $(PARTITION))" ]; then \

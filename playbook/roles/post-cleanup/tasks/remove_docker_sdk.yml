@@ -1,0 +1,17 @@
+---
+# Remove Docker SDK for Python installed by kolla-ansible bootstrap-servers
+# Ref: https://opendev.org/openstack/ansible-collection-kolla/src/branch/stable/2024.2/roles/docker_sdk/defaults/main.yml
+
+- name: Remove Docker SDK pip packages from virtualenv
+  pip:
+    name: "{{ docker_sdk_pip_packages }}"
+    state: absent
+    virtualenv: "{{ virtualenv }}"
+  when: virtualenv is not none and virtualenv | length > 0
+
+- name: Remove Docker SDK pip packages from system Python
+  pip:
+    name: "{{ docker_sdk_pip_packages }}"
+    executable: "{{ ansible_facts.python.executable | regex_replace('python(\\d+(\\.\\d+)?)$', 'pip\\1') }}"
+    state: absent
+  when: virtualenv is none or virtualenv | length == 0

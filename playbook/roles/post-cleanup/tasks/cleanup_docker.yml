@@ -1,0 +1,70 @@
+---
+# Remove all Docker images, packages, and services
+
+# ---- Stop running containers and remove all images ----
+- name: Get list of all running containers
+  command: docker ps -q
+  register: running_containers
+  ignore_errors: true
+  changed_when: false
+
+- name: Stop all running containers
+  command: docker stop {{ running_containers.stdout_lines | join(' ') }}
+  when: running_containers.rc == 0 and running_containers.stdout | length > 0
+
+- name: Remove all containers
+  command: docker rm -f $(docker ps -aq)
+  when: running_containers.rc == 0
+  ignore_errors: true
+
+- name: Remove all Docker images
+  command: docker rmi -f $(docker images -q)
+  when: running_containers.rc == 0
+  ignore_errors: true
+
+- name: Prune Docker system (volumes, networks, build cache)
+  command: docker system prune -a -f --volumes
+  when: running_containers.rc == 0
+  ignore_errors: true
+
+# ---- Stop and disable Docker services ----
+- name: Stop and disable Docker services
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop:
+    - docker.socket
+    - docker.service
+    - containerd.service
+  ignore_errors: true
+
+# ---- Remove Docker packages ----
+- name: Remove Docker packages (RHEL/Rocky/CentOS)
+  yum:
+    name: "{{ docker_packages }}"
+    state: absent
+  when: ansible_os_family == "RedHat"
+
+- name: Remove Docker packages (Debian/Ubuntu)
+  apt:
+    name: "{{ docker_packages }}"
+    state: absent
+    purge: true
+  when: ansible_os_family == "Debian"
+
+# ---- Clean up residual files ----
+- name: Remove Docker data directories
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/docker
+    - /var/lib/containerd
+    - /etc/docker
+
+- name: Remove Docker repo file (RHEL/Rocky/CentOS)
+  file:
+    path: /etc/yum.repos.d/docker-ce.repo
+    state: absent
+  when: ansible_os_family == "RedHat"

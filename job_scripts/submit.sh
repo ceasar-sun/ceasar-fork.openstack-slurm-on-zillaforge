@@ -42,26 +42,34 @@ fi
 IMAGE_PATH="$PROJECT_DIR/kolla-ansible.sif"
 
 # 3. 設定要掛載進容器的目錄 (Bind Mounts)
-BIND_ARGS="-B $PROJECT_DIR/kolla-ansible/etc/kolla/:/etc/kolla -B $PROJECT_DIR/kolla-ansible/etc/openstack/:/etc/openstack"
+BIND_ARGS="-B $PROJECT_DIR/kolla-ansible/etc/kolla/:/etc/kolla -B $PROJECT_DIR/kolla-ansible/etc/openstack/:/etc/openstack -B $PROJECT_DIR/playbook:/playbook"
 
 # 4. 啟動 Singularity 並執行 payload.sh
 echo "開始執行 $PAYLOAD_SCRIPT Job，目標節點: $NODE_LIST"
 
 if [ "$ACTION" = "add" ]; then
-    # 背景執行，讓 submit.sh 的 wait 能被 SIGUSR1 中斷並觸發 trap
-    singularity exec $BIND_ARGS $IMAGE_PATH bash "$PAYLOAD_DIR/$PAYLOAD_SCRIPT" $NODE_LIST
+    ## add node pre-hook: run ansible playbook for pre deploy task
+    singularity exec $BIND_ARGS $IMAGE_PATH \
+    ansible-playbook -i /etc/kolla/inventroy/ --limit $NODE_LIST /playbook/pre_add.yml
 
-    echo "Expanding Compute to existing cluster finished, wait for Recycle signal."
-    trap 'echo "Receive recycle signal, exit..."; exit 0' SIGUSR1
-    # 關閉 set -e，避免 wait 被信號中斷時因非零返回值直接退出（繞過 trap）
-    set +e
-    sleep infinity &
-    wait $!
-    set -e
+    ## add node: run add_computes.sh
+    singularity exec $BIND_ARGS $IMAGE_PATH \
+    bash "$PAYLOAD_DIR/$PAYLOAD_SCRIPT" $NODE_LIST
+
+    ## add node post-hook: run ansible playbook for post deploy task
+    singularity exec $BIND_ARGS $IMAGE_PATH \
+    ansible-playbook -i /etc/kolla/inventroy/ --limit $NODE_LIST /playbook/post_add.yml
+
 else
-    singularity exec $BIND_ARGS $IMAGE_PATH bash "$PAYLOAD_DIR/$PAYLOAD_SCRIPT" $NODE_LIST
+    ## delete node pre-hook: run ansible playbook for pre delete compute task
+    singularity exec $BIND_ARGS $IMAGE_PATH \
+    ansible-playbook -i /etc/kolla/inventroy/ --limit $NODE_LIST /playbook/pre_del.yml
 
-    # send SIGUSR1 讓 expand job graceful exit
-    scancel --batch --signal=SIGUSR1 $OCCUPY_JOB_ID
-    echo "回收先前佔位 Job, ID: $OCCUPY_JOB_ID。"
+    ## delete node: run del_computes.sh
+    singularity exec $BIND_ARGS $IMAGE_PATH \
+    bash "$PAYLOAD_DIR/$PAYLOAD_SCRIPT" $NODE_LIST
+
+    ## delete node post-hook: run ansible playbook for post delete compute task
+    singularity exec $BIND_ARGS $IMAGE_PATH \
+    ansible-playbook -i /etc/kolla/inventroy/ --limit $NODE_LIST /playbook/post_del.yml
 fi

@@ -1,0 +1,9 @@
+---
+# Remove ANSIBLE GENERATED HOSTS block from /etc/hosts
+
+- name: Remove kolla-ansible generated hosts block
+  ansible.builtin.blockinfile:
+    dest: /etc/hosts
+    marker: "# {mark} ANSIBLE GENERATED HOSTS"
+    block: ""
+    state: absent

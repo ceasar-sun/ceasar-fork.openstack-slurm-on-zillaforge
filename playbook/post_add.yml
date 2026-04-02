@@ -1,0 +1,15 @@
+###
+# ansible-playbook -i <inventory> playbook/disable_slurmd.yml
+#
+##
+---
+- name: Stop and disable slurmd service
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Stop and disable slurmd
+      ansible.builtin.systemd:
+        name: slurmd
+        state: stopped
+        enabled: false
