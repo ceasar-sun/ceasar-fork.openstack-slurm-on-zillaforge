@@ -24,9 +24,9 @@ DEST ?=
 		slurm-up slurm-down \
 		openstack-up openstack-down \
 		kolla-image kolla-up kolla-shell kolla-down \
-		singilarity-image singilarity-shell \
-		singilarity-srun-expand   singilarity-srun-shrink \
-		singilarity-sbatch-expand singilarity-sbatch-shrink
+		singularity-image singularity-shell \
+		singularity-srun-expand   singularity-srun-shrink \
+		singularity-sbatch-expand singularity-sbatch-shrink
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-32s %s\n", $$1, $$2; if ($$1 == "sync-from" || $$1 == "kolla-shell" || $$1 == "help" || $$1 == "sync-to") printf "\n"}' $(MAKEFILE_LIST)
@@ -106,58 +106,58 @@ kolla-down: ## Stop the Kolla-Ansible containers
 kolla-shell: ## Open a shell inside the Kolla-Ansible container
 	docker exec -u kolla -w /home/kolla -e HOME=/home/kolla -it kolla_ansible bash
 
-singilarity-image: ## Build the Singularity Kolla-Ansible image
+singularity-image: ## Build the Singularity Kolla-Ansible image
 	singularity build $(SIF_FILE) $(KOLLA_SINGULARITYFILE)
 
-singilarity-shell: ## Open Singularity Shell
+singularity-shell: ## Open Singularity Shell
 	singularity shell \
 	-B kolla-ansible/etc/kolla/:/etc/kolla \
 	-B kolla-ansible/etc/openstack/:/etc/openstack \
 	-B playbook:/playbook \
 	$(SIF_FILE)
 
-singilarity-srun-expand: ## srun expand compute nodes
+singularity-srun-expand: ## srun expand compute nodes
 	@if [ -z "$(strip $(PARTITION))" ]; then \
-		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singilarity-srun-expand)"; \
+		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singularity-srun-expand)"; \
 		exit 1; \
 	fi
 	@if [ -z "$(strip $(OCCUPY_NUM))" ]; then \
-		echo "ERROR: OCCUPY_NUM must be set (for example: make OCCUPY_NUM=<NUM_NODES> singilarity-srun-expand)"; \
+		echo "ERROR: OCCUPY_NUM must be set (for example: make OCCUPY_NUM=<NUM_NODES> singularity-srun-expand)"; \
 		exit 1; \
 	fi
 	srun -J expand -p $(PARTITION) -N $(OCCUPY_NUM) bash $(MAKEFILE_DIR)job_scripts/submit.sh add
 
-singilarity-srun-shrink: ## srun shrink compute nodes
+singularity-srun-shrink: ## srun shrink compute nodes
 	@if [ -z "$(strip $(PARTITION))" ]; then \
-		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singilarity-sbatch-shrink)"; \
+		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singularity-sbatch-shrink)"; \
 		exit 1; \
 	fi
 	@if [ -z "$(strip $(JOB_ID))" ]; then \
-		echo "ERROR: JOB_ID must be set (for example: make JOB_ID=<JOB_ID> singilarity-sbatch-shrink)"; \
+		echo "ERROR: JOB_ID must be set (for example: make JOB_ID=<JOB_ID> singularity-sbatch-shrink)"; \
 		exit 1; \
 	fi	
 	srun -J shrink -p $(PARTITION) -N 1 bash $(MAKEFILE_DIR)job_scripts/submit.sh del $(JOB_ID)
 
-singilarity-sbatch-expand: ## Run batch Job to expand compute nodes
+singularity-sbatch-expand: ## Run batch Job to expand compute nodes
 	@if [ -z "$(strip $(PARTITION))" ]; then \
-		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singilarity-sbatch)"; \
+		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singularity-sbatch)"; \
 		exit 1; \
 	fi
 	@if [ -z "$(strip $(OCCUPY_NUM))" ]; then \
-		echo "ERROR: OCCUPY_NUM must be set (for example: make OCCUPY_NUM=<NUM_NODES> singilarity-sbatch)"; \
+		echo "ERROR: OCCUPY_NUM must be set (for example: make OCCUPY_NUM=<NUM_NODES> singularity-sbatch)"; \
 		exit 1; \
 	fi
 	sbatch -J expand -p $(PARTITION) -N $(OCCUPY_NUM) \
 		--export=ALL,PROJECT_DIR=$(MAKEFILE_DIR),PAYLOAD_DIR=$(MAKEFILE_DIR)job_scripts \
 		$(MAKEFILE_DIR)job_scripts/submit.sh add
 
-singilarity-sbatch-shrink: ## Run batch Job to shrink compute nodes from previous expand job
+singularity-sbatch-shrink: ## Run batch Job to shrink compute nodes from previous expand job
 	@if [ -z "$(strip $(PARTITION))" ]; then \
-		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singilarity-sbatch-shrink)"; \
+		echo "ERROR: PARTITION must be set (for example: make PARTITION=<PARTITION_NAME> singularity-sbatch-shrink)"; \
 		exit 1; \
 	fi
 	@if [ -z "$(strip $(JOB_ID))" ]; then \
-		echo "ERROR: JOB_ID must be set (for example: make JOB_ID=<JOB_ID> singilarity-sbatch-shrink)"; \
+		echo "ERROR: JOB_ID must be set (for example: make JOB_ID=<JOB_ID> singularity-sbatch-shrink)"; \
 		exit 1; \
 	fi	
 	sbatch -J shrink -p $(PARTITION) -N 1 \
