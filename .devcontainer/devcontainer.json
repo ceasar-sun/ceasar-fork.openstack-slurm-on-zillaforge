@@ -12,13 +12,22 @@
 				"vtkn.amazon-bedrock-copilot-chat",
 				"onnovalkering.vscode-singularity",
 				"bierner.markdown-mermaid"
-			]
+			],
+			"settings": {
+				"terminal.integrated.defaultProfile.linux": "bash",
+				"terminal.integrated.profiles.linux": {
+					"bash": {
+						"path": "/usr/local/bin/bash"
+					}
+				},
+			}
 		}
 	},
 	"containerEnv": {
 		"TFENV_AUTO_INSTALL": "false",
 	},
 	"features": {
-    	"ghcr.io/cirolosapio/devcontainers-features/alpine-git:0": {}
+		"ghcr.io/cirolosapio/devcontainers-features/alpine-git:0": {},
+		"ghcr.io/cirolosapio/devcontainers-features/alpine-docker-outside-of-docker:0": {},
 	}
 }
